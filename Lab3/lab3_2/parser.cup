@@ -1,0 +1,163 @@
+import java_cup.runtime.*;
+import java.io.*;
+
+parser code {:
+
+    public void report_error(String message, Object info) {
+        System.err.print("ERROR: Syntax error");
+        if (info instanceof Symbol)
+            if (((Symbol)info).left != -1) {
+                int line = (((Symbol)info).left) + 1;
+                int column = (((Symbol)info).right) + 1;
+                System.err.print(" (line " + line + ", column " + column + "): ");
+            } else System.err.print(": ");
+        else System.err.print(": ");
+    }
+
+:};
+
+terminal ID, TYPE, SIGN_MODIFIER, LENGTH_MODIFIER, STORAGE, VOID, CONST;
+terminal STRING, RELOP, LOGOP, ASSOP;
+terminal IF, ELSE, DO, WHILE, SWITCH, CASE, FOR, BREAK, DEFAULT, RETURN;
+terminal RO, RC, BO, BC, SO, SC, C, CM, S;
+terminal PLUS, MINUS, STAR, DIV, MOD, INCR, DECR, EQ;
+
+non terminal prog, prog_ok;
+non terminal decl_prot_list, decl_prot;
+non terminal function_list, function_decl, function_prot, function, function_body;
+non terminal parameter_list, parameter;
+non terminal decl_list, decl, id_list, id, pointer, const_list, string_list;
+non terminal void, type;
+non terminal stmt_list, stmts, stmt, block;
+non terminal assign_stmt, expr, term, arg_list, args, arg;
+non terminal if_stmt, cond, comparison;
+non terminal while_stmt, for_stmt, expr_list;
+non terminal switch_stmt, case_list, case_stmt, default_stmt, return_stmt;
+
+precedence left LOGOP;
+precedence left PLUS, MINUS;
+precedence left STAR, DIV, MOD;
+precedence left INCR, DECR;
+
+start with prog;
+
+prog ::= prog_ok {: System.out.println("Program correctly recognised."); :};
+
+prog_ok ::= decl_prot_list function_list | function_list;
+
+decl_prot_list ::= decl_prot_list decl_prot | decl_prot;
+
+decl_prot ::= decl | function_prot;
+
+function_prot ::= function_decl SC;
+
+function_decl ::= type pointer RO parameter_list RC
+		  | void ID RO parameter_list RC
+		  | STORAGE type pointer RO parameter_list RC
+		  | STORAGE void ID RO parameter_list RC;
+
+parameter_list ::= parameter_list CM parameter | parameter | void;
+
+parameter ::= type pointer | type pointer SO SC;
+
+void ::= VOID | ;
+
+type ::= SIGN_MODIFIER TYPE
+	 | LENGTH_MODIFIER TYPE
+	 | SIGN_MODIFIER LENGTH_MODIFIER TYPE
+         | LENGTH_MODIFIER
+         | TYPE;
+
+
+
+function_list ::= function | function_list function;
+
+function ::= function_decl BO function_body BC;
+
+function_body ::= | decl_list stmt_list;
+
+decl_list ::= decl | decl_list decl;
+
+decl ::= type id_list S | STORAGE type id_list S;
+
+id_list ::= id_list CM id | id;
+
+id ::= pointer 
+       | pointer SO CONST SC
+       | pointer EQ CONST
+       | pointer EQ MINUS CONST
+       | pointer SO SC EQ BO const_list BC
+       | pointer SO SC EQ BO string_list BC;
+
+pointer ::= STAR pointer | ID;
+
+const_list ::= const_list CM CONST | CONST;
+
+string_list ::= string_list CM STRING | STRING;
+
+
+
+stmt_list ::= stmts | ;
+
+stmts ::= stmts stmt | stmt;
+
+stmt ::= assign_stmt S
+	 | if_stmt
+	 | while_stmt
+         | for_stmt
+	 | switch_stmt
+	 | BREAK S
+	 | block
+	 | return_stmt S
+	 | S;
+
+
+assign_stmt ::= ID EQ expr | ID ASSOP expr | expr;
+
+expr ::= expr PLUS expr
+	 | expr MINUS expr
+	 | expr STAR expr
+	 | expr DIV expr
+	 | expr MOD expr
+	 | expr INCR
+	 | INCR expr
+	 | expr DECR
+	 | DECR expr
+	 | RO expr RC
+	 | MINUS expr
+	 | PLUS expr
+	 | term;
+
+term ::= ID | CONST | ID RO arg_list RC | ID SO CONST SC | ID SO ID SC;
+
+arg_list ::= args | ;
+
+args ::= args CM arg | arg;
+
+arg ::= term | STRING;
+
+
+if_stmt ::= IF RO cond RC stmt ELSE stmt | IF RO cond RC stmt;
+
+cond ::= cond LOGOP cond | RO cond RC | comparison | expr;
+
+comparison ::= expr RELOP expr;
+
+while_stmt ::= WHILE RO cond RC stmt;
+
+for_stmt ::= FOR RO expr_list S cond S expr_list RC stmt;
+
+expr_list ::= expr_list CM assign_stmt | assign_stmt;
+
+switch_stmt ::= SWITCH RO ID RC BO case_list BC 
+		| SWITCH RO ID RC BO case_list default_stmt BC;
+
+case_list ::= case_list case_stmt | case_stmt;
+
+case_stmt ::= CASE CONST C stmt_list;
+
+default_stmt ::= DEFAULT C stmt_list;
+
+return_stmt ::= RETURN expr | RETURN;
+
+block ::= BO stmt_list BC;
