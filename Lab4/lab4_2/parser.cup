@@ -1,0 +1,124 @@
+import java_cup.runtime.*;
+import java.io.*;
+
+parser code {:
+
+	public boolean isCorrect = true;
+
+    public void report_error(String message, Object info) {
+        System.err.print("ERROR: Syntax error");
+        if (info instanceof Symbol)
+            if (((Symbol)info).left != -1) {
+                int line = (((Symbol)info).left) + 1;
+                int column = (((Symbol)info).right) + 1;
+                System.err.print(" (line " + line + ", column " + column + "): ");
+            } else System.err.print(": ");
+        else System.err.print(": ");
+    }
+    public void syntax_error(Symbol cur_token){}
+
+    public int getLine() {
+        if (((Symbol)stack.elementAt(tos)).left != -1) {
+            return ((Symbol)stack.elementAt(tos)).left+1;
+        } else {
+			return -1;
+		}
+    }
+    
+    public int getColumn() {
+        if (((Symbol)stack.elementAt(tos)).left != -1) {
+            return ((Symbol)stack.elementAt(tos)).right+1;
+        } else {
+			return -1;
+		}
+    }
+
+:};
+
+action code {:
+
+    private void printSyntaxError(String message){
+        System.err.println("SYNTAX ERROR: line: "+parser.getLine()+" col: "+parser.getColumn()+": "+message);
+        parser.isCorrect = false;
+        parser.done_parsing();
+    }
+    private void printSyntaxWarning(String message){
+        System.err.println("SYNTAX WARNING: line: "+parser.getLine()+" col: "+parser.getColumn()+": "+message);
+        parser.isCorrect = false;
+    }
+        
+:}
+
+terminal INT, DOUBLE, ID;
+terminal PRINT, IF, WHILE, THEN, ELSE;
+terminal RO, RC, BO, BC, SC, CM, SO, S;
+terminal PLUS, MINUS, STAR, DIV;
+terminal MIN, MAJ, MIN_EQ, EQ_MIN, MAJ_EQ, EQ_MAJ, EQ;
+terminal AND, OR, NOT;
+terminal INT_TYPE, DOUBLE_TYPE;
+terminal UMINUS;
+
+non terminal prog, stmt_list, stmt, if, while, assignment, print;
+non terminal expr;
+non terminal mineq, majeq;
+non terminal decl_list, decl, var_list, var;
+non terminal type, array;
+non terminal if_condition, while_condition;
+non terminal id;
+
+precedence left OR;
+precedence left AND;
+precedence left NOT;
+precedence left MIN, MAJ, MIN_EQ, EQ_MIN, MAJ_EQ, EQ_MAJ, EQ;
+precedence left PLUS, MINUS;
+precedence left STAR, DIV;
+precedence left UMINUS;
+
+start with prog;
+
+prog ::= decl_list stmt_list {: if (parser.isCorrect) System.out.println("Programm correctly recognised"); :};
+
+decl_list ::= decl_list decl | ;
+decl ::= type var_list S | type error S {: printSyntaxWarning("Error in declaration"); :};
+type ::= INT_TYPE | DOUBLE_TYPE;
+var_list ::= var | var_list CM var;
+var ::= ID array;
+array ::= | array SO INT SC;
+
+stmt_list ::= stmt_list stmt | stmt | error stmt {: printSyntaxWarning("Error in statement"); :};
+stmt ::= if | while | assignment | print | BO stmt_list BC
+		 | BO stmt_list error BC {: printSyntaxWarning("Missing ; before }"); :}
+		 | BO error BC {: printSyntaxWarning("Missing ; before }"); :}
+		 | error S {: printSyntaxWarning("Error in statement"); :};
+
+assignment ::= id S | id EQ expr S
+			   | id EQ error S {: printSyntaxWarning("Error in expression"); :}
+			   | error EQ expr S {: printSyntaxWarning("Error in assignment"); :};
+
+print ::= PRINT id S
+		  | PRINT error S {: printSyntaxWarning("Error in 'print' instruction"); :};
+
+if ::= IF if_condition stmt ELSE stmt | IF if_condition stmt
+	   | IF if_condition stmt error stmt {: printSyntaxWarning("Error: 'else' expected in 'if' instruction"); :};
+if_condition ::= RO expr RC
+				 | RO error RC {: printSyntaxWarning("Error in 'if' condition"); :}
+				 | error expr RC {: printSyntaxWarning("Error: '(' expected in 'if' instruction"); :}
+				 | RO expr error {: printSyntaxWarning("Error: ')' expected in 'if' instruction"); :};
+
+while ::= WHILE while_condition stmt;
+while_condition ::= RO expr RC
+					| RO error RC {: printSyntaxWarning("Error in 'while' condition"); :}
+				    | error expr RC {: printSyntaxWarning("Error: '(' expected in 'while' instruction"); :}
+				    | RO expr error {: printSyntaxWarning("Error: ')' expected in 'while' instruction"); :};
+
+expr ::= 
+	expr AND expr | expr OR expr | NOT expr |
+	expr EQ EQ expr | expr MIN expr | expr MAJ expr | expr mineq expr | expr majeq expr |
+	expr PLUS expr | expr MINUS expr | expr STAR expr | expr DIV expr |
+	RO expr RC | id | INT | DOUBLE | MINUS INT %prec UMINUS | MINUS DOUBLE %prec UMINUS
+	| RO error RC {: printSyntaxWarning("Error in expression"); :};
+
+mineq ::= MIN_EQ | EQ_MIN;
+majeq ::= MAJ_EQ | EQ_MAJ;
+
+id ::= ID | ID SO INT SC | ID SO ID SC | error SC {: printSyntaxWarning("Error in vector"); :};

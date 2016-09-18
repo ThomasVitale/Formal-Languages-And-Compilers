@@ -1,0 +1,87 @@
+import java_cup.runtime.*;
+import java.io.*;
+   
+parser code {:
+	
+    public static int fact_found  = 0;
+    public static int error_found = 0;
+	
+    public static void main(String[] args) {
+	try {
+        /* Scanner instantiation */
+        scanner l = new scanner(new FileReader(args[0]));
+        /* Parser instantiation */
+        parser p = new parser(l);
+        /* Run the parser */
+        Object result = p.parse().value;      
+      } catch (NullPointerException e){
+              System.err.println("Syntax error");
+      } catch (FileNotFoundException e){
+              System.err.println("Errore opening file " + args[0]);
+      } catch (Exception e){
+              e.printStackTrace();
+      }
+    }
+
+    public void report_error(String message, Object info) {
+        System.err.print("ERROR: Syntax error");
+        if (info instanceof Symbol)
+            if (((Symbol)info).left != -1){
+                int line = (((Symbol)info).left)+1;
+                int column = (((Symbol)info).right)+1;
+                System.err.print(" (row "+line+", column "+column+"): "+message);
+            } else System.err.print(": "+message);
+        else System.err.print(": "+message);
+    }
+    public void syntax_error(Symbol cur_token){}
+
+    public Symbol getToken() {
+        return ((Symbol)stack.elementAt(tos));
+    }
+
+:};
+
+terminal RO, RC, PIPE, PT, CM, SEP1, SEP2, ATOM, VARIABLE;
+non terminal log_prog, elements, element, fact, rule, predicates, predicate, interrogation, arguments, argument;
+
+start with log_prog;
+
+log_prog ::= elements interrogation elements {:
+				if(parser.fact_found == 0 || parser.error_found == 1) {
+					return null;
+				}
+				System.out.println("Program correctly recognised.");
+			:};
+
+elements ::= elements element | ;
+
+element ::= fact | rule;
+
+fact ::= predicate PT {: parser.fact_found = 1; :}
+		 | error PT {:
+			parser.report_error("Fact error\n", parser.getToken());
+			parser.error_found = 1;
+		:};
+
+rule ::= predicate SEP1 predicates PT 
+		 | error SEP1 predicates PT {:
+			parser.report_error("Rule error\n", parser.getToken());
+			parser.error_found = 1;
+		 :};
+
+predicates ::= predicates CM predicate | predicate;
+
+interrogation ::= SEP2 predicates PT {: System.out.println("Interrogation recognised"); :}
+				  | SEP2 error PT {:
+						parser.report_error("Interrogation error\n", parser.getToken());
+						parser.error_found = 1;
+				 :};
+
+predicate ::= ATOM RO arguments RC | ATOM;
+
+arguments ::= arguments CM argument | argument;
+
+argument ::= predicate | VARIABLE;
+
+
+
