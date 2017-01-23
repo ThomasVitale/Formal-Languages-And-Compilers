@@ -1,0 +1,163 @@
+/* RegEx Special Characters */
+
+“ \[ ] ^ -? . * + | ( ) $ / { } % < >
+
+/* Make */
+
+jflex lexer.jflex
+java java_cup.MainDrawTree -expect <number_of_conflicts> parser.cup
+java Main example.txt
+
+/* Common RegEx */
+
+digit = [0-9]
+string = \" ~ \"
+id = [A-Za-z_][A-Za-z0-9_]*
+integer = ([1-9][0-9]*|0)
+double = (([0-9]+\.[0-9]*) | ([0-9]*\.[0-9]+)) (e|E('+'\'-')?[0-9]+)?
+real_scalar = ("-")?[0-9]+("."[0-9]+((e|E)("+"|"-")?[0-9]+)?)?
+signInt = ("+"|"-")?[0-9]+
+signIntAlt = [-+]?([1-9][0-9]*|0)
+float = ("+"|"-")?([1-9][0-9]*"."[0-9]*) | ("."[0-9]+)| (0"."[0-9]*)
+
+nl = \n|\r|\r\n
+ws = [ \t]
+
+directive = "#"(define|include).*{nl}
+comment = "/*" ~ "*/"
+
+/* JFlex structure */
+
+import java.io.*
+import java_cup.runtime.*
+
+%% 
+
+%{Java code%}
+%init{  %init}
+%eof{ %eof}
+
+%standalone
+%caseless
+%unicode
+
+%line
+%column
+%char
+
+%state MYSTATE
+%xstate MYEXSTATE
+
+%%
+
+{id} { return new Symbol(sym.ID); }
+
+/* JFlex methods and fields */
+String yytext()
+int yylength()
+char yycharat(int pos)
+
+int yyline
+int yycolumn
+int yychar
+
+<MYSTATE>[abc] {yybegin(YYINITIAL)} 
+
+<<EOF>> {return YYEOF;}
+
+/* Cup */
+import java_cup.runtime.*;
+
+terminal ...;
+non terminal ...;
+start with ...;
+
+init with {: :}
+scan with {: :}
+
+parser code {: :} // add or override parser methods
+action code {: :} // symbol table
+
+<non_terminal> ::= Right_Hand_Size {: /* Java code */ :} | Alt {: /* Java code */ :};
+
+/* Integrating JFlex and Cup */
+public Symbol(int sym_id);
+public Symbol(int sym_id, int left, int right);
+public Symbol(int sym_id, Object o);
+public Symbol(int sym_id, int left, int right, Object o);
+
+/* Main */
+import java.io.*;
+
+public class Main {
+
+	public static void main(String[] args) {
+		try {
+		      /* Scanner instantiation */
+		      Yylex l = new Yylex(new FileReader(args[0]));
+		      /* Parser instantiation */
+		      parser p = new parser(l);
+		      /* Start the parser */
+		      Object result = p.parse(); 
+		      //Object resul = p.debug_parse();     
+		    } catch (Exception e) {
+		      e.printStackTrace();
+		    }
+	}
+}
+
+/* Ambiguous grammars in Cup */
+- Shift/Reduce conflict -> shift
+- Reduce/Reduce conflict -> first defined rule
+
+/* Precedence */
+precedence left (reduce)
+precedence right (shift)
+precedence nonassoc
+
+%prec uminus
+
+/* Error handling */
+
+// in JFlex
+%{
+	private Symbol symbol(int type) {
+		return new Symbol(type, yyline, yycolumn);
+	}
+	private Symbol symbol(int type, Object value) {
+		return new Symbol(type, yyline, yycolumn, value);
+	}
+%}
+
+// in Cup
+parser code {:
+	public void report_error(String message, Object info) {
+		StringBuffer m = new StringBuffer(message);
+		if (info instanceof Symbol) {
+			if (((Symbol)info).left != -1 && ((Symbol)info).right |= -1) {
+				int line = (((Symbol)info).left)+1;
+				int column = (((Symbol)info).right)+1;
+				m.append("(line " + line + ", column " + column + ")");
+			}
+		}
+		System.err.println(m);	
+	}
+:}
+
+/* Syntax errors */
+public void syntax_error(Symbol cur_token); // report_error
+public void unrecovered_syntax_error(Symbol cur_token); // report_fatal_error
+
+/* Inherited attributes */
+Object stack(int position);
+
+parser code {:
+	public Object stack(int position) {
+		return (((Symbol)stack.elementAt(tos+position)).value);
+	}
+:};
+
+/* Type checker */
+int add_var(String name, te_node type);
+int add_type(String name, te_node type);
+te_node type_lookup(String name);
