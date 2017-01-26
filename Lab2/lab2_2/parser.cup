@@ -1,0 +1,29 @@
+import java_cup.runtime.*;
+
+terminal 	ARROW, CL, CM, S, SEP,
+			DATE, INT, ISBN, LETTER, NAME,
+			AV, BO, LI, LS, SO;
+
+non terminal 	library,
+				authors_list, authors_entry,
+				books_list, books_entry, collocation, book_genre,
+				users_list, users_entry,
+				loans_list, loans_entry;
+
+start with library;
+
+library ::= authors_list SEP users_list {: 
+				System.out.println("File correctly recognized."); 
+			:};
+
+authors_list ::= authors_list authors_entry | authors_entry;
+authors_entry ::= NAME ARROW books_list S;
+books_list ::= books_list CM books_entry | books_entry;
+books_entry ::= ISBN CL NAME CL INT CL collocation | ISBN CL NAME CL INT;
+collocation ::= book_genre INT LETTER | book_genre INT;
+book_genre ::= LI AV | LI SO | LS AV | LS BO | LS SO;
+
+users_list ::= users_list users_entry | users_entry;
+users_entry ::= NAME CL loans_list S;
+loans_list ::= loans_list CM loans_entry | loans_entry;
+loans_entry ::= DATE ISBN;

@@ -2,13 +2,21 @@
 
 “ \[ ] ^ -? . * + | ( ) $ / { } % < >
 
-/* Make */
+/* Make JFlex */
+
+jflex lexer.jflex
+javac Lexer.java
+java Lexer <filename>
+
+/* Make JFlex & Cup*/
 
 jflex lexer.jflex
 java java_cup.MainDrawTree -expect <number_of_conflicts> parser.cup
 java Main example.txt
 
 /* Common RegEx */
+
+// keywords first, then identifiers
 
 digit = [0-9]
 string = \" ~ \"
@@ -33,11 +41,12 @@ import java_cup.runtime.*
 
 %% 
 
-%{Java code%}
+%{ Java code %}
 %init{  %init}
 %eof{ %eof}
 
-%standalone
+%class Lexer // the generated class is named Lexer.java
+%standalone // generates the main method
 %caseless
 %unicode
 

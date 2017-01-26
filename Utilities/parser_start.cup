@@ -1,0 +1,13 @@
+import java_cup.runtime.*;
+
+terminal ;
+
+non terminal ;
+
+start with ;
+
+init with {: :}
+scan with {: :}
+
+parser code {: :} // add or override parser methods
+action code {: :} // symbol table

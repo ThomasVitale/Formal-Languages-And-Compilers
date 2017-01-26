@@ -11,22 +11,22 @@ import java.io.*;
 
 %{
 	FileWriter out;
-	int nTags, nTables, nH1, nH2, nH3, nH4;
+	int nH1, nH2, nH3, nH4, nTables, nTags;
+
+	private void writeOut() {
+		writeOut(yytext());
+	}
 
 	private void writeOut(String s) {
 		out.write(s);
 		out.flush();
-	}
-
-	private void writeOut() {
-		writeOut(yytext());
 	}
 %}
 
 %init{
 	try {
 		out = new FileWriten(new File("output.html"));
-		nTags = nTables = nH1 = nH2 = nH3 = nH4 = 0;
+		nH1 = nH2 = nH3 = nH4 = nTables nTags = 0;
 	} catch (IOException e) {
 		System.err.println(e);
 	}
