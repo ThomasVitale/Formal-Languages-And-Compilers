@@ -12,6 +12,7 @@ java Lexer <filename>
 
 jflex lexer.jflex
 java java_cup.MainDrawTree -expect <number_of_conflicts> parser.cup
+javac *.java
 java Main example.txt
 
 /* Common RegEx */

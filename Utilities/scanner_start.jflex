@@ -7,7 +7,7 @@ import java_cup.runtime.*
 %init{  %init}
 %eof{ %eof}
 
-%class Lexer
+%class Scanner
 %cup
 %unicode
 
@@ -15,6 +15,16 @@ import java_cup.runtime.*
 
 %line
 %column
+
+%{
+	private Symbol symbol(int type) {
+		return new Symbol(type, yyline, yycolumn);
+	}
+	private Symbol symbol(int type, Object value) {
+		return new Symbol(type, yyline, yycolumn, value);
+	}
+%}
+
 %char
 
 %state MYSTATE

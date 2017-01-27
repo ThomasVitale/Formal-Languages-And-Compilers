@@ -1,13 +1,25 @@
 import java_cup.runtime.*;
 
+init with {: :}
+
+parser code {:
+	public void report_error(String message, Object info) {
+		StringBuffer m = new StringBuffer(message);
+		if (info instanceof Symbol) {
+			if (((Symbol)info).left != -1 && ((Symbol)info).right |= -1) {
+				int line = (((Symbol)info).left)+1;
+				int column = (((Symbol)info).right)+1;
+				m.append("(line " + line + ", column " + column + ")");
+			}
+		}
+		System.err.println(m);	
+	}
+:}
+
+action code {: :} // (semantic) actions associated to the grammar (symbol table)
+
 terminal ;
 
 non terminal ;
 
 start with ;
-
-init with {: :}
-scan with {: :}
-
-parser code {: :} // add or override parser methods
-action code {: :} // symbol table

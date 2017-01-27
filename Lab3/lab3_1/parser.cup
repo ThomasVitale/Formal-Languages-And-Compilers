@@ -1,5 +1,4 @@
 import java_cup.runtime.*;
-import java.io.*;
 
 parser code {:
 
@@ -16,62 +15,67 @@ parser code {:
 
 :};
 
-terminal INT, DOUBLE, ID;
-terminal PRINT, IF, WHILE, ELSE;
-terminal RO, RC, BO, BC, SC, SO, CM, S;
-terminal PLUS, MINUS, STAR, DIV;
-terminal MIN, MAJ, MIN_EQ, EQ_MIN, MAJ_EQ, EQ_MAJ, EQ;
-terminal AND, OR, NOT;
-terminal INT_TYPE, DOUBLE_TYPE;
-terminal UMINUS;
+terminal INT_TYPE, DOUBLE_TYPE,
+		 PRINT, IF, ELSE, WHILE,
+		 RO, RC, SO, SC, BO, BC,
+		 PLUS, MINUS, STAR, DIV, ASSIGN, S,
+		 EQ, GREQ, GR, SMEQ, SM, AND, OR, NOT, CM,
+		 INT, DOUBLE, ID,
+		 UMINUS;
 
-non terminal prog, stmt_list, stmt, if, while, assignment, print;
-non terminal expr;
-non terminal mineq, majeq;
-non terminal decl_list, decl, var_list, var;
-non terminal type, array;
-non terminal if_condition, while_condition;
-non terminal id;
+non terminal main,
+			 decl_list, decl, type, var_list, var,
+			 stmt_list, stmt, if, while, print, assignment,
+			 id, index, expr, condition;
 
 precedence left OR;
 precedence left AND;
 precedence left NOT;
-precedence left MIN, MAJ, MIN_EQ, EQ_MIN, MAJ_EQ, EQ_MAJ, EQ;
+precedence left EQ, GREQ, GR, SMEQ, SM;
 precedence left PLUS, MINUS;
 precedence left STAR, DIV;
 precedence left UMINUS;
 
-start with prog;
+start with main;
 
-prog ::= decl_list stmt_list {: System.out.println("Programm correctly recognised"); :};
+main ::= decl_list stmt_list {: 
+			System.out.println("Programm correctly recognised"); 
+		 :};
 
 decl_list ::= decl_list decl | ;
 decl ::= type var_list S;
 type ::= INT_TYPE | DOUBLE_TYPE;
-var_list ::= var | var_list CM var;
-var ::= ID array;
-array ::= | array SO INT SC;
+var_list ::= var_list CM var | var;
+var ::= ID SO INT SC | ID;
 
-stmt_list ::= stmt_list stmt | stmt;
-stmt ::= if | while | assignment | print | BO stmt_list BC;
+stmt_list ::= stmt_list stmt | ;
+stmt ::= if | while | print | assignment | BO stmt_list BC;
 
-assignment ::= id S | id EQ expr S;
+assignment ::= id S | id ASSIGN expr S;
+id ::= ID | ID SO index SC;
+index ::= INT | ID;
 
-print ::= PRINT id S;
+if ::= IF condition stmt ELSE stmt | IF condition stmt;
+while ::= WHILE condition stmt;
+condition ::= RO expr RC;
+print ::= PRINT RO id RC;
 
-if ::= IF if_condition stmt ELSE stmt | IF if_condition stmt;
-if_condition ::= RO expr RC;
-
-while ::= WHILE while_condition stmt;
-while_condition ::= RO expr RC;
-
-expr ::= 
-	expr AND expr | expr OR expr | NOT expr |
-	expr EQ EQ expr | expr MIN expr | expr MAJ expr | expr mineq expr | expr majeq expr |
-	expr PLUS expr | expr MINUS expr | expr STAR expr | expr DIV expr |
-	RO expr RC | id | INT | DOUBLE | MINUS INT %prec UMINUS | MINUS DOUBLE %prec UMINUS;
-
-mineq ::= MIN_EQ | EQ_MIN;
-majeq ::= MAJ_EQ | EQ_MAJ;
-
-id ::= ID | ID SO INT SC | ID SO ID SC;
+expr ::=  expr AND expr
+		| expr OR expr
+		| expr NOT expr
+		| expr EQ expr
+		| expr GREQ expr
+		| expr GR expr
+		| expr SMEQ expr
+		| expr SM expr
+		| expr PLUS expr
+		| expr MINUS expr
+		| expr STAR expr
+		| expr DIV expr
+		| RO expr RC
+		| id
+		| INT
+		| DOUBLE
+		| MINUS INT %prec UMINUS
+		| MINUS DOUBLE %prec UMINUS; 
+		 
