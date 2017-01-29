@@ -1,5 +1,5 @@
-import java.io.*
-import java_cup.runtime.*
+import java.io.*;
+import java_cup.runtime.*;
 
 %% 
 
@@ -36,7 +36,7 @@ ws = [ \t]
 
 %%
 
-{INT} 		{ return new Symbol(sym.INT); }
+{INT} 		{ return symbol(sym.INT, new Integer(yytext())); }
 
 {ws} | {nl} {;}
 

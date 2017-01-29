@@ -58,7 +58,7 @@ index ::= INT | ID;
 if ::= IF condition stmt ELSE stmt | IF condition stmt;
 while ::= WHILE condition stmt;
 condition ::= RO expr RC;
-print ::= PRINT RO id RC;
+print ::= PRINT id s;
 
 expr ::=  expr AND expr
 		| expr OR expr

@@ -93,8 +93,8 @@ action code {: :} // symbol table
 /* Integrating JFlex and Cup */
 public Symbol(int sym_id);
 public Symbol(int sym_id, int left, int right);
-public Symbol(int sym_id, Object o);
-public Symbol(int sym_id, int left, int right, Object o);
+public Symbol(int sym_id, Object o); // for semantic values passing
+public Symbol(int sym_id, int left, int right, Object o); // for semantic values passing
 
 /* Main */
 import java.io.*;
@@ -171,3 +171,9 @@ parser code {:
 int add_var(String name, te_node type);
 int add_type(String name, te_node type);
 te_node type_lookup(String name);
+
+/* Parser debugging */
+-dump_grammar
+-dump_states
+-dump_table
+-dump

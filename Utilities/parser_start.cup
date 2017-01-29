@@ -3,10 +3,14 @@ import java_cup.runtime.*;
 init with {: :}
 
 parser code {:
+
+	public static int fact_found  = 0;
+    public static int error_found = 0;
+
 	public void report_error(String message, Object info) {
 		StringBuffer m = new StringBuffer(message);
 		if (info instanceof Symbol) {
-			if (((Symbol)info).left != -1 && ((Symbol)info).right |= -1) {
+			if (((Symbol)info).left != -1 && ((Symbol)info).right != -1) {
 				int line = (((Symbol)info).left)+1;
 				int column = (((Symbol)info).right)+1;
 				m.append("(line " + line + ", column " + column + ")");
@@ -14,12 +18,26 @@ parser code {:
 		}
 		System.err.println(m);	
 	}
+	
+	// public void syntax_error(Symbol cur_token){}
+	
+	public Symbol getToken() {
+        return ((Symbol)stack.elementAt(tos));
+    }
 :}
 
-action code {: :} // (semantic) actions associated to the grammar (symbol table)
+action code {: :} // (semantic) actions associated to the grammar (symbol table, new class)
 
-terminal ;
+terminal Object ;
 
-non terminal ;
+non terminal Object ;
 
 start with ;
+
+fact ::= predicate PT {:
+		 	parser.fact_found = 1;
+		 :}
+		 | error PT {:
+		 	parser.report_error("Fact error\n", parser.getToken());
+		 	parser.error_found = 1;
+		 :};

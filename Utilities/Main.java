@@ -9,7 +9,8 @@ public class Main {
 			/* Parser instantiation */
 			parser p = new parser(s);
 			/* Start the parser */
-			Object result = p.parse();      
+			Object result = p.parse(); 
+			// Object result = p.debug_parse();     
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

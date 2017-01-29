@@ -1,46 +1,45 @@
+import java.io.*;
 import java_cup.runtime.*;
 
-%%
+%% 
 
-%class scanner
-%unicode
+%class Scanner
 %cup
+%unicode
+
 %line
 %column
-%state COMMENT
 
 %{
 	private Symbol symbol(int type) {
 		return new Symbol(type, yyline, yycolumn);
 	}
+	private Symbol symbol(int type, Object value) {
+		return new Symbol(type, yyline, yycolumn, value);
+	}
 %}
 
-nl = \n|\r|\r\n
-ws = [ \t]+
+comment = "/*" ~ "*/"
+VARIABLE = [A-Z_][a-zA-Z0-9_]*
 number = ("+"|"-")?[0-9]+("."[0-9]+(e("+"|"-")[0-9]+)?)?
-atom = [a-z][a-zA-Z0-9_]*
-variable = [A-Z_][a-zA-Z0-9_]*
+ATOM = ([a-z]|{number})[a-zA-Z0-9_]*
+nl = \n|\r|\r\n
+ws = [ \t]
 
 %%
 
-{nl} | {ws} {;}
+"."			{ return symbol(sym.PT); }
+","			{ return symbol(sym.CM); }
+":-"		{ return symbol(sym.SEP_R); }
+"?-"		{ return symbol(sym.SEP_I); }
+"("			{ return symbol(sym.RO); }
+")"			{ return symbol(sym.RC); }
 
-"(" {return symbol(sym.RO);}
-")" {return symbol(sym.RC);}
-"|" {return symbol(sym.PIPE);}
-"." {return symbol(sym.PT);}
-"," {return symbol(sym.CM);}
-":-" {return symbol(sym.SEP1);}
-"?-" {return symbol(sym.SEP2);}
-{number} {return symbol(sym.ATOM);}
-{atom} {return symbol(sym.ATOM);}
-{variable} {return symbol(sym.VARIABLE);}
+{ATOM}		{ return symbol(sym.ATOM); }
+{VARIABLE}	{ return symbol(sym.VARIABLE); }
 
-"/*" {yybegin(COMMENT);}
-<COMMENT>{
-	[^*]* {;}
-	"*"+[^*/]* {;}
-	"*"+"/" {yybegin(YYINITIAL);}
-}
+{comment}	{;}
 
+{ws} | {nl} {;}
 
+. 			{System.out.print("Scanner error: " + yytext());}
