@@ -1,53 +1,49 @@
+import java.io.*;
 import java_cup.runtime.*;
 
-%%
+%% 
 
-%class scanner
-%line
-%column
+%class Scanner
 %cup
 %unicode
 
+%line
+%column
+
 %{
-  private Symbol symbol(int type) {
-    return new Symbol(type, yyline, yycolumn);
-  }
-  private Symbol symbol(int type, Object value) {
-    return new Symbol(type, yyline, yycolumn, value);
-	
-  }
+	private Symbol symbol(int type) {
+		return new Symbol(type, yyline, yycolumn);
+	}
+	private Symbol symbol(int type, Object value) {
+		return new Symbol(type, yyline, yycolumn, value);
+	}
 %}
 
+REAL = ("-")?[0-9]+("."[0-9]+(e("+"|"-")[0-9]+)?)?
 nl = \n|\r|\r\n
 ws = [ \t]
 
-constant = ("-")?[0-9]+("."[0-9]+((e|E)("+"|"-")?[0-9]+)?)?
-scalar = [a-z]
-vector = [A-Z]
-
 %%
 
-"+" {return symbol(sym.PLUS);}
-"-" {return symbol(sym.MINUS);}
-"*" {return symbol(sym.STAR);}
-"/" {return symbol(sym.DIV);}
-"=" {return symbol(sym.EQ);}
-"(" {return symbol(sym.RO);}
-")" {return symbol(sym.RC);}
-"[" {return symbol(sym.SO);}
-"]" {return symbol(sym.SC);}
-";" {return symbol(sym.SC);}
-"." {return symbol(sym.PT);}
-"," {return symbol(sym.CM);}
-"^" {return symbol(sym.EXP);}
-"?" {return symbol(sym.QM);}
+","			{ return symbol(sym.CM); }
+";"			{ return symbol(sym.S); }
+"?"			{ return symbol(sym.END); }
+"="			{ return symbol(sym.ASSIGN); }
+"("			{ return symbol(sym.RO); }
+")"			{ return symbol(sym.RC); }
+"["			{ return symbol(sym.SO); }
+"]"			{ return symbol(sym.SC); }
+"+"			{ return symbol(sym.PLUS); }
+"-"			{ return symbol(sym.MINUS); }
+"*"			{ return symbol(sym.STAR); }
+"/"			{ return symbol(sym.DIV); }
+"^"			{ return symbol(sym.POWER); }
+"."			{ return symbol(sym.PT); }
 
-{constant} { return symbol(sym.CONST, new Double(yytext())); }
-{scalar} { return symbol(sym.SCALAR, new Character(yycharat(0))); }
-{vector} { return symbol(sym.VECTOR, new Character(yycharat(0))); }
+{REAL} 		{ return symbol(sym.REAL, new Double(yytext())); }
+[a-z] 		{ return symbol(sym.SCALAR, new Character(yycharat(0))); }
+[A-Z] 		{ return symbol(sym.VECTOR, new Character(yycharat(0))); }
 
-{nl} | {ws} {;}
+{ws} | {nl} {;}
 
-
-
-
+. 			{System.out.print("Scanner error: " + yytext());}

@@ -1,141 +1,155 @@
 import java_cup.runtime.*;
-import java.io.InputStreamReader;
 import java.util.HashMap;
-import java.util.Vector;
 
 init with {:
 	symbol_table = new HashMap();
 :};
 
 parser code {:
+
 	public HashMap symbol_table;
 
-	public void syntax_error(Symbol current_symbol) {
-		StringBuffer m = new StringBuffer("Error");
-
-		if (current_symbol.left != -1) {
-			m.append(" in line " + (current_symbol.left + 1));
-			m.append(", column " + (current_symbol.right + 1));
+	public void report_error(String message, Object info) {
+		StringBuffer m = new StringBuffer(message);
+		if (info instanceof Symbol) {
+			if (((Symbol)info).left != -1 && ((Symbol)info).right != -1) {
+				int line = (((Symbol)info).left)+1;
+				int column = (((Symbol)info).right)+1;
+				m.append("(line " + line + ", column " + column + ")");
+			}
 		}
-		m.append(", symbol: " + (current_symbol));
-		m.append(" : Syntax Error");
-
-		System.err.println(m);
+		System.err.println(m);	
 	}
-:};
+	
+:}
 
-terminal Double CONST;
-terminal Character SCALAR;
-terminal Character VECTOR;
-terminal PLUS, MINUS, STAR, DIV, EQ, RO, RC, BO, BC, SO, SC, PT, CM, EXP, QM;
-terminal UMINUS;
 
-non terminal Object session, expr_list, expr;
-non terminal Object scalar_assign, vector_assign, scalar_expr_Obj, vector_expr_Obj;
-non terminal Double scalar_expr, scalar;
-non terminal Double[] vector_expr, vector;
+terminal CM, S, END, ASSIGN, RO, RC, SO, SC,
+		 PLUS, MINUS, STAR, DIV, POWER, PT, UMINUS;		 
+terminal Double REAL;
+terminal Character SCALAR, VECTOR;
 
-precedence left MINUS, PLUS;
-precedence left DIV, STAR, PT;
-precedence left EXP;
+non terminal Object calculator, operation_list, operation;
+non terminal Object scalar_assignment, vector_assignment;
+non terminal Object scalar_operation, vector_operation;
+non terminal Double scalar_expression, scalar;
+non terminal Double[] vector_expression, vector;
+
+precedence left PLUS, MINUS;
+precedence left PT;
+precedence left STAR, DIV;
+precedence left POWER;
 precedence left UMINUS;
 
-start with session;
+start with calculator;
 
-session ::= expr_list QM;
+calculator ::= operation_list END;
 
-expr_list ::= expr_list SC expr | expr;
+operation_list ::= operation_list S operation | operation;
 
-expr ::= scalar_assign | vector_assign | vector_expr_Obj | scalar_expr_Obj;
+operation ::= scalar_assignment | vector_assignment | scalar_operation | vector_operation;
 
-vector_expr_Obj ::= vector_expr:e {:
-	System.out.println("vector expression: [" + e[0] + "," + e[1] + "]");
-:};
+/* Assignments */
+scalar_assignment ::= SCALAR:a ASSIGN scalar_expression:b {:
+						parser.symbol_table.put(a, b);
+						System.out.println("assignment: " + a + " <- " + b);
+					  :};
+vector_assignment ::= VECTOR:a ASSIGN vector_expression:b {:
+						parser.symbol_table.put(a, b);
+						System.out.println("assignment: " + a + " <- [" + b[0] + "," + b[1] + "]");
+					  :}; 
+					  
+/* Operations */
+scalar_operation ::= scalar_expression:e {:
+						System.out.println("scalar expression: " + e.doubleValue());
+					 :};					  
 
-scalar_expr_Obj ::= scalar_expr:e {:
-	System.out.println("scalar expression: " + e.doubleValue());
-:};
+vector_operation ::= vector_expression:e {:
+						System.out.println("vector expression: [" + e[0] + "," + e[1] + "]");
+					 :};
+					 
+/* Scalar expression */
+scalar_expression ::= scalar_expression:a PLUS scalar_expression:b {:
+						RESULT = new Double(a.doubleValue() + b.doubleValue());
+					  :}
+					  | scalar_expression:a MINUS scalar_expression:b {:
+							RESULT = new Double(a.doubleValue() - b.doubleValue());
+					  :}
+					  | scalar_expression:a STAR scalar_expression:b {:
+							RESULT = new Double(a.doubleValue() * b.doubleValue());
+					  :}
+					  | scalar_expression:a DIV scalar_expression:b {:
+							RESULT = new Double(a.doubleValue() / b.doubleValue());
+					  :}
+					  | scalar_expression:a POWER scalar_expression:b {:
+							RESULT = new Double(Math.pow(a.doubleValue(), b.doubleValue()));
+					  :}
+					  | MINUS scalar_expression:a {:
+							RESULT = new Double(-(a.doubleValue()));
+					  :} %prec UMINUS
+					  | RO scalar_expression:a RC {:
+							RESULT = a;
+					  :}
+					  | vector_expression:a PT vector_expression:b {:
+							RESULT = new Double(a[0].doubleValue() * b[0].doubleValue() + 
+												a[1].doubleValue() * b[1].doubleValue());
+					  :}
+					  | scalar:a {:
+							RESULT = a;
+					  :};
 
-/* Vector Operations */
+/* Scalar */
+scalar ::= REAL:a {:
+		   		RESULT = a;
+		   :}
+		   | SCALAR:s {:
+		   		RESULT = (Double)parser.symbol_table.get(s);
+		   :};
 
-vector_expr ::= vector_expr:a PLUS vector_expr:b {:
-					RESULT = new Double[2];
-					RESULT[0] = new Double(a[0].doubleValue() + b[0].doubleValue());
-					RESULT[1] = new Double(a[1].doubleValue() + b[1].doubleValue());
-				:}
-				| vector_expr:a MINUS vector_expr:b {:
-					RESULT = new Double[2];
-					RESULT[0] = new Double(a[0].doubleValue() - b[0].doubleValue());
-					RESULT[1] = new Double(a[1].doubleValue() - b[1].doubleValue());
-				:}
-				| scalar_expr:a STAR vector_expr:b {:
-					RESULT = new Double[2];
-					RESULT[0] = new Double(a.doubleValue() * b[0].doubleValue());
-					RESULT[1] = new Double(a.doubleValue() * b[1].doubleValue());
-				:}
-				| scalar_expr:a DIV vector_expr:b {:
-					RESULT = new Double[2];
-					RESULT[0] = new Double(a.doubleValue() / b[0].doubleValue());
-					RESULT[1] = new Double(a.doubleValue() / b[1].doubleValue());
-				:}
-				| vector_expr:a STAR scalar_expr:b {:
-					RESULT = new Double[2];
-					RESULT[0] = new Double(a[0].doubleValue() * b.doubleValue());
-					RESULT[1] = new Double(a[1].doubleValue() * b.doubleValue());
-				:}
-				| vector_expr:a DIV scalar_expr:b {:
-					RESULT = new Double[2];
-					RESULT[0] = new Double(a[0].doubleValue() / b.doubleValue());
-					RESULT[1] = new Double(a[1].doubleValue() / b.doubleValue());
-				:}
-				| RO vector_expr:a RC {: RESULT = a; :}
-				| vector:a {: RESULT = a; :};
+/* Vector expression */
+vector_expression ::= vector_expression:a PLUS vector_expression:b {:
+						RESULT = new Double[2];
+						RESULT[0] = new Double(a[0].doubleValue() + b[0].doubleValue());
+						RESULT[1] = new Double(a[1].doubleValue() + b[1].doubleValue());
+					  :}
+					  | vector_expression:a MINUS vector_expression:b {:
+					  	RESULT = new Double[2];
+						RESULT[0] = new Double(a[0].doubleValue() - b[0].doubleValue());
+						RESULT[1] = new Double(a[1].doubleValue() - b[1].doubleValue());
+					  :}
+					  | scalar_expression:s STAR vector_expression:v {:
+					  	RESULT = new Double[2];
+						RESULT[0] = new Double(s.doubleValue() * v[0].doubleValue());
+						RESULT[1] = new Double(s.doubleValue() * v[1].doubleValue());
+					  :}
+					  | scalar_expression:s DIV vector_expression:v {:
+					  	RESULT = new Double[2];
+						RESULT[0] = new Double(s.doubleValue() / v[0].doubleValue());
+						RESULT[1] = new Double(s.doubleValue() / v[1].doubleValue());
+					  :}
+					  | vector_expression:v STAR scalar_expression:s {:
+					  	RESULT = new Double[2];
+						RESULT[0] = new Double(s.doubleValue() * v[0].doubleValue());
+						RESULT[1] = new Double(s.doubleValue() * v[1].doubleValue());
+					  :}
+					  | vector_expression:v DIV scalar_expression:s {:
+					  	RESULT = new Double[2];
+						RESULT[0] = new Double(s.doubleValue() / v[0].doubleValue());
+						RESULT[1] = new Double(s.doubleValue() / v[1].doubleValue());
+					  :}
+					  | RO vector_expression:a RC {:
+					  	RESULT = a;
+					  :}
+					  | vector:a {:
+					  	RESULT = a;
+					  :};
 
-/* Scalar Operations */
-
-scalar_expr ::= scalar_expr:a PLUS scalar_expr:b {:
-					RESULT = new Double(a.doubleValue() + b.doubleValue());
-				:}
-				| scalar_expr:a MINUS scalar_expr:b {:
-					RESULT = new Double(a.doubleValue() - b.doubleValue());
-				:}
-				| scalar_expr:a STAR scalar_expr:b {:
-					RESULT = new Double(a.doubleValue() * b.doubleValue());
-				:}
-				| scalar_expr:a DIV scalar_expr:b {:
-					RESULT = new Double(a.doubleValue() / b.doubleValue());
-				:}
-				| MINUS scalar_expr:a {:
-					RESULT = new Double(- a.doubleValue());
-				:} %prec UMINUS
-				| scalar_expr:b EXP scalar_expr:e {:
-					RESULT = new Double(Math.pow(b.doubleValue(), e.doubleValue()));
-				:}
-				| RO scalar_expr:e RC {:
-					RESULT = e;
-				:}
-				| vector_expr:a PT vector_expr:b {:
-					RESULT = new Double(a[0].doubleValue() * b[0].doubleValue() + a[1].doubleValue() * b[1].doubleValue());
-				:}
-				| scalar:a {: RESULT = a; :};
-
-/* Assignment */
-
-scalar_assign ::= SCALAR:a EQ scalar_expr:b {:
-	parser.symbol_table.put(a,b);
-	System.out.println("assignment: " + a + "->" + b);
-:};
-
-vector_assign ::= VECTOR:a EQ vector_expr:b {:
-	parser.symbol_table.put(a,b);
-	System.out.println("assignment: " + a + "->[" + b[0] + "," + b[1] + "]");
-:};
-
-scalar ::= CONST:a {:RESULT = a; :} | SCALAR:a {: RESULT = (Double)parser.symbol_table.get(a); :};
-
-vector ::= VECTOR:a {: RESULT = (Double[]) parser.symbol_table.get(a); :}
-		   | SO scalar_expr:a CM scalar_expr:b SC {:
-		    	RESULT = new Double[2];
-				RESULT[0] = a;
-				RESULT[1] = b;
+/* Vector */
+vector ::= VECTOR:a {:
+		   	RESULT = (Double[])parser.symbol_table.get(a);
+		   :}
+		   | SO scalar_expression:a CM scalar_expression:b SC {:
+		   		RESULT = new Double[2];
+		   		RESULT[0] = a;
+		   		RESULT[1] = b;
 		   :};
