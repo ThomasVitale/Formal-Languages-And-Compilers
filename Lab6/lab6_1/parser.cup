@@ -1,0 +1,187 @@
+import java_cup.runtime.*;
+import java.io.*;
+
+init with {:
+	outBuffer = new StringBuffer();
+:};
+
+
+parser code {:
+
+	public int label = 0;
+
+	public static String dumpOutput;
+
+	public StringBuffer outBuffer;
+
+	public int genLabel() {
+		label++;
+		return label;
+	};
+
+    public void report_error(String message, Object info) {
+		StringBuffer m = new StringBuffer(message);
+		if (info instanceof Symbol) {
+			if (((Symbol)info).left != -1 && ((Symbol)info).right != -1) {
+				int line = (((Symbol)info).left)+1;
+				int column = (((Symbol)info).right)+1;
+				m.append("(line " + line + ", column " + column + ")");
+			}
+		}
+		System.err.println(m);	
+	}
+	
+	public Object stack(int position) {	
+		return (((Symbol)stack.elementAt(tos+position)).value);
+	}
+
+:};
+
+action code {:
+	private void dump(String s) {
+        if (parser.dumpOutput == "stdout") {
+            System.out.print(s);           
+        } else {
+            parser.outBuffer.append(s);
+        }
+    }
+
+    private void dumpln(String s) {
+        if (parser.dumpOutput == "stdout") {
+            System.out.println(s);           
+        } else {
+            parser.outBuffer.append(s+"\n");
+        }
+    }
+:};
+
+terminal INT_TYPE, DOUBLE_TYPE,
+		 PRINT, IF, ELSE, WHILE,
+		 RO, RC, SO, SC, BO, BC,
+		 PLUS, MINUS, STAR, DIV, ASSIGN, S,
+		 EQ, GREQ, GR, SMEQ, SM, AND, OR, NOT, CM,
+		 DOUBLE,
+		 UMINUS; 
+terminal String ID;
+terminal Integer INT;
+
+non terminal main, decl_list, decl, var_list, print, assignment,
+			 stmt_list, stmt, if, while;
+non terminal String type, var, expr, index, id, condition;
+non terminal Integer[] empty_while;
+non terminal Integer empty_if, empty_else;
+
+precedence left OR;
+precedence left AND;
+precedence left NOT;
+precedence left EQ, GREQ, GR, SMEQ, SM;
+precedence left PLUS, MINUS;
+precedence left STAR, DIV;
+precedence left UMINUS;
+
+start with main;
+
+main ::= decl_list stmt_list {: 
+			dumpln("END");
+			if (parser.dumpOutput == "stdout") {
+				System.out.println(parser.outBuffer);
+			} else {
+				try {
+					BufferedWriter out = new BufferedWriter(new FileWriter(parser.dumpOutput));
+					String outText = parser.outBuffer.toString();
+					out.write(outText);
+					out.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			} 
+		:};
+
+decl_list ::= decl_list decl | ;
+decl ::= type var_list S;
+type ::= INT_TYPE {:
+		 	RESULT = new String("INT");
+		 :}
+		 | DOUBLE_TYPE {:
+		 	RESULT = new String("DOUBLE");
+		 :};
+var_list ::= var_list CM {: RESULT = parser.stack(-2); :} var | var;
+var ::= ID:a SO INT:b SC {:
+			dumpln(new String((String)parser.stack(-4) + " " + a + "[" + b.toString() + "]"));
+		:}
+		| ID:a {:
+			dumpln(new String((String)parser.stack(-1) + " " + a));
+		:};
+
+stmt_list ::= stmt_list stmt | stmt;
+stmt ::= if | while | print | assignment | BO stmt_list BC;
+
+assignment ::= id:a S {:
+			   		dumpln(new String(a));
+			   :}
+			   | id:a ASSIGN expr:b S {:
+			   		dumpln(new String("EVAL " + b));
+			   		dumpln(new String("ASS " + a));
+			   :};
+id ::= ID:a {: 
+			RESULT = a; 
+	   :}
+	   | ID:a SO index:b SC {:
+	   		RESULT = new String(a + "[" + b + "]");
+	   :};
+index ::= INT:a {: RESULT = new String(a.toString()); :} 
+		  | ID:a {: RESULT = a; :};
+
+if ::= IF condition empty_if stmt ELSE empty_else:y stmt {:
+		  	dump("L" + y.toString() + ": ");
+	   :}
+	   | IF condition empty_if:x stmt {:
+	   		dump("L" + x.toString() + ": ");
+	   :};
+empty_if ::= {:
+			  	RESULT = (Integer)parser.genLabel();
+			  	dumpln("EVAL" + (String)parser.stack(0));
+			  	dumpln("GOTOF" + "L" + RESULT.toString());
+			 :};
+empty_else ::= {:
+			  	RESULT = (Integer)parser.genLabel();
+			  	dumpln("GOTO" + "L" + RESULT.toString());
+			  	dump("L" + (String)parser.stack(-2) + ": ");
+			   :};	
+			   
+while ::= WHILE condition empty_while:x stmt {:
+		  	dumpln("GOTO" + "L" + x[0].toString());
+		  	dump("L" + x[1].toString() + ": ");
+		  :};
+condition ::= RO expr:a RC {:
+			  	RESULT = a;
+			  :};
+empty_while ::= {:
+				  	RESULT = new Integer[2];
+				  	RESULT[0] = (Integer)parser.genLabel();
+				  	RESULT[1] = (Integer)parser.genLabel();
+				  	dumpln("L" + RESULT[0].toString() + ":" + "EVAL" + (String)parser.stack(0));
+				  	dumpln("GOTOF" + "L" + RESULT[1].toString());
+			  	:};
+
+print ::= PRINT id:a S {: dumpln(new String("PRINT " + a)); :};
+
+expr ::=  expr:a AND expr:b {: RESULT = new String(a + " " + b + " " + "&"); :}
+		| expr:a OR expr:b {: RESULT = new String(a + " " + b + " " + "|"); :}
+		| NOT expr:a {: RESULT = new String(a + " " + "!"); :}
+		| expr:a EQ expr:b {: RESULT = new String(a + " " + b + " " + "=="); :}
+		| expr:a GREQ expr:b {: RESULT = new String(a + " " + b + " " + ">="); :}
+		| expr:a GR expr:b {: RESULT = new String(a + " " + b + " " + ">"); :}
+		| expr:a SMEQ expr:b {: RESULT = new String(a + " " + b + " " + "<="); :}
+		| expr:a SM expr:b {: RESULT = new String(a + " " + b + " " + "<"); :}
+		| expr:a PLUS expr:b {: RESULT = new String(a + " " + b + " " + "+"); :}
+		| expr:a MINUS expr:b {: RESULT = new String(a + " " + b + " " + "-"); :}
+		| expr:a STAR expr:b {: RESULT = new String(a + " " + b + " " + "*"); :}
+		| expr:a DIV expr:b {: RESULT = new String(a + " " + b + " " + "/"); :}
+		| RO expr:a RC {: RESULT = new String(a); :}
+		| id:a {: RESULT = a; :}
+		| INT:a {: RESULT = new String(a.toString()); :}
+		| DOUBLE:a {: RESULT = new String(a.toString()); :}
+		| MINUS INT:a {: RESULT = new String("-" + a.toString()); :} %prec UMINUS 
+		| MINUS DOUBLE:a {: RESULT = new String("-" + a.toString()); :} %prec UMINUS; 
+		 
