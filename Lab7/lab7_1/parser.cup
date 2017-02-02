@@ -1,0 +1,323 @@
+import java_cup.runtime.*;
+import java.io.*;
+import java.util.HashMap;
+
+init with {:
+	outBuffer = new StringBuffer();
+	errorBuffer = new StringBuffer();
+:};
+
+
+parser code {:
+
+	public int label = 0;
+	
+	HashMap<String,SymbolType> symbolTable = new HashMap<String,SymbolType>();
+
+	public static String dumpOutput;
+
+    public int errors = 0;
+    public int warnings = 0;
+
+	public StringBuffer outBuffer;
+	public StringBuffer errorBuffer;
+
+	public int genLabel() {
+		label++;
+		return label;
+	};
+
+    public void report_error(String message, Object info) {
+		StringBuffer m = new StringBuffer(message);
+		if (info instanceof Symbol) {
+			if (((Symbol)info).left != -1 && ((Symbol)info).right != -1) {
+				int line = (((Symbol)info).left)+1;
+				int column = (((Symbol)info).right)+1;
+				m.append("(line " + line + ", column " + column + ")");
+			}
+		}
+		System.err.println(m);	
+	}
+	
+	public Symbol getToken() {
+        return ((Symbol)stack.elementAt(tos));
+    }
+	
+	public Object stack(int position) {	
+		return (((Symbol)stack.elementAt(tos+position)).value);
+	}
+	
+    public int getLine() {
+        if (((Symbol)stack.elementAt(tos)).left != -1) {
+            return ((Symbol)stack.elementAt(tos)).left+1;
+        } else {
+        	return -1;
+        }
+    }
+    
+    public int getColumn() {
+        if (((Symbol)stack.elementAt(tos)).left != -1) {
+            return ((Symbol)stack.elementAt(tos)).right+1;
+        } else {
+        	return -1;
+        }
+    }
+
+:};
+
+action code {:
+
+	class Expr {
+        private String value;
+        private SymbolType type;
+
+        private SymbolType lookupSymbolType(String id) {
+            SymbolType type = parser.symbolTable.get(id);
+            if (type == null){
+                pError("Variable \"" + id + "\" not declared");
+                return new SymbolType(-1, -1);
+            }
+            return type;
+        }
+        
+        Expr(String value, SymbolType type) {
+            this.value = value;
+            this.type = type;
+        }
+        
+        Expr(String id) {
+            this.value = id;
+            this.type = lookupSymbolType(id);
+        }
+
+        Expr(String id, Integer pos) {
+            this.value = id + "[" + pos.toString() + "]";
+            this.type = lookupSymbolType(id);
+
+            int size = type.getSize();
+            if ((pos >= size) && (size != -1)) {
+                pError("Array index (" + pos + ") exceed array size (" + size + ")");
+            }
+        }
+        
+        Expr(String id, String pos) {
+            this.value = id + "[" + pos +"]";
+            this.type = lookupSymbolType(id);
+        }
+
+
+        public String toString() {
+            return value;
+        }
+        
+        public SymbolType getSymbolType() {
+            return type;
+        }
+
+        public SymbolType checkSymbolType(Expr expr) {
+            int type1 = type.getType();
+            int type2 = expr.getSymbolType().getType();
+
+            if (type1 == type2) {
+                return type;
+            } else if ((type1 != -1) && (type2 != -1)) {
+                pWarning("Operation between int and double, int number casted to double");
+                return new SymbolType(1, 1);
+            } else {
+                return new SymbolType(-1, -1);
+            }
+        }
+        
+        public void checkSymbolTypeAssignment(Expr expr) {
+            int type1 = type.getType();
+            int type2 = expr.getSymbolType().getType();
+
+            if ((type1 == 0) && (type2 == 1)) {
+                pWarning("Assignment of a double value to an int variable");
+            } else if ((type1 == 1) && (type2 == 0)) {
+                pWarning("Assignment of an int value to an double variable");
+            }
+        }
+        
+    }
+    
+    private void pError(String message) {
+        parser.errorBuffer.append("ERROR: line: " + parser.getLine() + " col: " + parser.getColumn() + ": " + message + "\n");
+        parser.errors++;
+    }
+    
+    private void pWarning(String message) {
+        parser.errorBuffer.append("WARNING: line: " + parser.getLine() + " col: " + parser.getColumn() + ": " + message + "\n");
+        parser.warnings++;
+    }
+
+	private void dump(String s) {
+        if (parser.dumpOutput == "stdout") {
+            System.out.print(s);           
+        } else {
+            parser.outBuffer.append(s);
+        }
+    }
+
+    private void dumpln(String s) {
+        if (parser.dumpOutput == "stdout") {
+            System.out.println(s);           
+        } else {
+            parser.outBuffer.append(s+"\n");
+        }
+    }
+:};
+
+terminal INT_TYPE, DOUBLE_TYPE,
+		 PRINT, IF, ELSE, WHILE,
+		 RO, RC, SO, SC, BO, BC,
+		 PLUS, MINUS, STAR, DIV, ASSIGN, S,
+		 EQ, GREQ, GR, SMEQ, SM, AND, OR, NOT, CM,
+		 DOUBLE,
+		 UMINUS; 
+terminal String ID;
+terminal Integer INT;
+
+non terminal main, decl_list, decl, var_list, print, assignment,
+			 stmt_list, stmt, if, while;
+non terminal String type, var, condition;
+non terminal Integer[] empty_while;
+non terminal Integer empty_if, empty_else;
+non terminal Expr id, expr;
+
+precedence left OR;
+precedence left AND;
+precedence left NOT;
+precedence left EQ, GREQ, GR, SMEQ, SM;
+precedence left PLUS, MINUS;
+precedence left STAR, DIV;
+precedence left UMINUS;
+
+start with main;
+
+main ::= decl_list stmt_list {:
+			if (parser.errors == 0) { 
+				dumpln("END");
+				if (parser.dumpOutput == "stdout") {
+					System.out.println(parser.outBuffer);
+				} else {
+					try {
+						BufferedWriter out = new BufferedWriter(new FileWriter(parser.dumpOutput));
+						String outText = parser.outBuffer.toString();
+						out.write(outText);
+						out.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				} 
+			} else {
+				System.out.println("Semantic errors found.");
+			}
+			
+			System.err.println(parser.errorBuffer);
+			
+			System.err.println("Semantic Errors: " + parser.errors);
+            System.err.println("Semantic Warnings: " + parser.warnings);
+		:};
+
+decl_list ::= decl_list decl | ;
+decl ::= type var_list S;
+type ::= INT_TYPE {:
+		 	RESULT = new String("INT");
+		 :}
+		 | DOUBLE_TYPE {:
+		 	RESULT = new String("DOUBLE");
+		 :};
+var_list ::= var_list CM {: RESULT = parser.stack(-2); :} var | var;
+var ::= ID:a SO INT:b SC {:
+			dumpln(new String((String)parser.stack(-4) + " " + a + "[" + b.toString() + "]"));
+			if (parser.stack(-4).equals("INT")) {
+				parser.symbolTable.put(a, new SymbolType(0,b));
+			} else if (parser.stack(-4).equals("DOUBLE")) {
+				parser.symbolTable.put(a, new SymbolType(1,b));
+			}
+		:}
+		| ID:a {:
+			dumpln(new String((String)parser.stack(-1) + " " + a));
+			if (parser.stack(-1).equals("INT")) {
+				parser.symbolTable.put(a, new SymbolType(0));
+			} else if (parser.stack(-1).equals("DOUBLE")) {
+				parser.symbolTable.put(a, new SymbolType(1));
+			}
+		:};
+
+stmt_list ::= stmt_list stmt | stmt;
+stmt ::= if | while | print | assignment | BO stmt_list BC;
+
+assignment ::= id:a S {:
+			   		dumpln(new String(a.toString()));
+			   :}
+			   | id:a ASSIGN expr:b S {:
+			   		a.checkSymbolTypeAssignment(b);
+			   		dumpln(new String("EVAL " + b.toString()));
+			   		dumpln(new String("ASS " + a.toString()));
+			   :};
+			   
+id ::= ID:a {: 
+			RESULT = new Expr(a); 
+	   :}
+	   | ID:a SO INT:b SC {:
+	   		RESULT = new Expr(a, b);
+	   :}
+	   | ID:a SO ID:b SC {:
+	   		RESULT = new Expr(a, b);
+	   :};
+
+if ::= IF condition empty_if stmt ELSE empty_else:y stmt {:
+		  	dump("L" + y.toString() + ": ");
+	   :}
+	   | IF condition empty_if:x stmt {:
+	   		dump("L" + x.toString() + ": ");
+	   :};
+empty_if ::= {:
+			  	RESULT = (Integer)parser.genLabel();
+			  	dumpln("EVAL" + (String)parser.stack(0));
+			  	dumpln("GOTOF" + "L" + RESULT.toString());
+			 :};
+empty_else ::= {:
+			  	RESULT = (Integer)parser.genLabel();
+			  	dumpln("GOTO" + "L" + RESULT.toString());
+			  	dump("L" + (String)parser.stack(-2) + ": ");
+			   :};	
+			   
+while ::= WHILE condition empty_while:x stmt {:
+		  	dumpln("GOTO" + "L" + x[0].toString());
+		  	dump("L" + x[1].toString() + ": ");
+		  :};
+condition ::= RO expr:a RC {:
+			  	RESULT = a.toString();
+			  :};
+empty_while ::= {:
+				  	RESULT = new Integer[2];
+				  	RESULT[0] = (Integer)parser.genLabel();
+				  	RESULT[1] = (Integer)parser.genLabel();
+				  	dumpln("L" + RESULT[0].toString() + ":" + "EVAL" + (String)parser.stack(0));
+				  	dumpln("GOTOF" + "L" + RESULT[1].toString());
+			  	:};
+
+print ::= PRINT id:a S {: dumpln(new String("PRINT " + a)); :};
+
+expr ::=  expr:a AND expr:b {: RESULT = new Expr(a + " " + b + " " + "&", a.checkSymbolType(b)); :}
+		| expr:a OR expr:b {: RESULT = new Expr(a + " " + b + " " + "|", a.checkSymbolType(b)); :}
+		| NOT expr:a {: RESULT = new Expr(a + " " + "!", a.getSymbolType()); :}
+		| expr:a EQ expr:b {: RESULT = new Expr(a + " " + b + " " + "==", a.checkSymbolType(b)); :}
+		| expr:a GREQ expr:b {: RESULT = new Expr(a + " " + b + " " + ">=", a.checkSymbolType(b)); :}
+		| expr:a GR expr:b {: RESULT = new Expr(a + " " + b + " " + ">", a.checkSymbolType(b)); :}
+		| expr:a SMEQ expr:b {: RESULT = new Expr(a + " " + b + " " + "<=", a.checkSymbolType(b)); :}
+		| expr:a SM expr:b {: RESULT = new Expr(a + " " + b + " " + "<", a.checkSymbolType(b)); :}
+		| expr:a PLUS expr:b {: RESULT = new Expr(a + " " + b + " " + "+", a.checkSymbolType(b)); :}
+		| expr:a MINUS expr:b {: RESULT = new Expr(a + " " + b + " " + "-", a.checkSymbolType(b)); :}
+		| expr:a STAR expr:b {: RESULT = new Expr(a + " " + b + " " + "*", a.checkSymbolType(b)); :}
+		| expr:a DIV expr:b {: RESULT = new Expr(a + " " + b + " " + "/", a.checkSymbolType(b)); :}
+		| RO expr:a RC {: RESULT = a; :}
+		| id:a {: RESULT = a; :}
+		| INT:a {: RESULT = new Expr(a.toString(), new SymbolType(0,1)); :}
+		| DOUBLE:a {: RESULT = new Expr(a.toString(), new SymbolType(1,1)); :}
+		| MINUS INT:a {: RESULT = new Expr("-" + a.toString(), new SymbolType(0,1)); :} %prec UMINUS 
+		| MINUS DOUBLE:a {: RESULT = new Expr("-" + a.toString(), new SymbolType(1,1)); :} %prec UMINUS; 
+		 
