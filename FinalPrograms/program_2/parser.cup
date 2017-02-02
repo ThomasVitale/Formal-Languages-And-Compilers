@@ -1,0 +1,86 @@
+import java_cup.runtime.*;
+import java.io.*;
+import java.util.*;
+
+init with {: 
+	symbolTable = new HashMap<String,Integer>();
+	
+	System.out.println("OUTPUT:");
+:}
+
+parser code {:
+
+	public static HashMap<String,Integer> symbolTable;
+
+	public void report_error(String message, Object info) {
+		StringBuffer m = new StringBuffer(message);
+		if (info instanceof Symbol) {
+			if (((Symbol)info).left != -1 && ((Symbol)info).right != -1) {
+				int line = (((Symbol)info).left)+1;
+				int column = (((Symbol)info).right)+1;
+				m.append("(line " + line + ", column " + column + ")");
+			}
+		}
+		System.err.println(m);	
+	}
+    
+    public Object stack(int position) {	
+		return (((Symbol)stack.elementAt(tos+position)).value);
+	}
+:}
+
+terminal SEP1, SEP2, RATE, TIME_TAG, DATE_TAG, CL, S, CM;
+terminal Integer INT;
+terminal String SONG, DATE, TIME, IP;
+
+non terminal song_list, item, item_list, program,
+			 date, time, date_time, user_list, user;
+non terminal Integer user_song_list;
+non terminal String user_song;
+
+start with program;
+
+program ::= SEP1 item_list SEP2 date_time user_list;
+
+item_list ::= item_list item | item;
+
+item ::= INT RATE CL song_list S {: System.out.println("OK"); :};
+
+song_list ::= song_list CM SONG:a INT:b {:
+				Integer rate = (Integer)parser.stack(-6);
+				Integer size = new Integer(rate.intValue() * b.intValue());
+				parser.symbolTable.put(a,size);
+			  :}
+			  | SONG:a INT:b {: 
+			  	Integer rate = (Integer)parser.stack(-4);
+			  	Integer size = new Integer(rate.intValue() * b.intValue());
+			  	parser.symbolTable.put(a,size);
+			  :};
+
+date_time ::= time date | date time;
+
+time ::= TIME_TAG TIME;
+
+date ::= DATE_TAG DATE;
+
+user_list ::= /* empty */ | user_list user;
+
+user ::= IP CL user_song_list:x S {:
+		 	System.out.println("TOTALE: " + x.toString());
+		 :};
+
+user_song_list ::= user_song_list:s CM SONG:a {:
+				   		Integer size = (Integer)parser.symbolTable.get(a);
+				   		System.out.println(a + " " + size.toString());
+				   		RESULT = new Integer(s.intValue() + size.intValue());
+				   :}
+			       | SONG:a {:
+			       		System.out.println(parser.stack(-2));
+			       		Integer size = (Integer)parser.symbolTable.get(a);
+			       		System.out.println(a + " " + size.toString());
+			       		RESULT = size;
+			       :};
+			  
+			  
+			  
+			  

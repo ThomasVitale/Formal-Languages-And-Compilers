@@ -24,6 +24,10 @@ parser code {:
 	public Symbol getToken() {
         return ((Symbol)stack.elementAt(tos));
     }
+    
+    public Object stack(int position) {	
+		return (((Symbol)stack.elementAt(tos+position)).value);
+	}
 :}
 
 action code {: :} // (semantic) actions associated to the grammar (symbol table, new class)

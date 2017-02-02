@@ -167,6 +167,19 @@ parser code {:
 	}
 :};
 
+/* Type Systems */
+
+// Base types
+int, float, char + void, type_error
+// Composite types
+struct, union 
+
+// Type constructors
+array(5, char) // char v[5]
+pointer(char) // char*
+struct((ixint) x (s x array(5,char))) // struct {int i; char s[5];}
+c(char x char) -> pointer(int) // int* f(char a, char b)
+
 /* Type checker */
 int add_var(String name, te_node type);
 int add_type(String name, te_node type);

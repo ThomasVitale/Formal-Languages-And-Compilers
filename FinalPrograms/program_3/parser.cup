@@ -1,0 +1,345 @@
+import java_cup.runtime.*;
+import java.io.*;
+
+parser code {:
+
+    public void report_error(String message, Object info) {
+        System.err.print("ERROR: Syntax error");
+        if (info instanceof Symbol)
+            if (((Symbol)info).left != -1) {
+                int line = (((Symbol)info).left) + 1;
+                int column = (((Symbol)info).right) + 1;
+                System.err.print(" (line " + line + ", column " + column + "): ");
+            } else System.err.print(": ");
+        else System.err.print(": ");
+    }
+	public void syntax_error(Symbol cur_token){}
+
+	public Symbol getToken() {
+		return ((Symbol)stack.elementAt(tos));
+	}
+
+	public Object stack(int position) {	
+		return (((Symbol)stack.elementAt(tos+position)).value);
+	}
+
+	public int getLine() {
+        if (((Symbol)stack.elementAt(tos)).left != -1) {
+            return ((Symbol)stack.elementAt(tos)).left + 1;
+        } else {
+			return -1;
+		}
+    }
+    
+    public int getColumn() {
+        if (((Symbol)stack.elementAt(tos)).left != -1){
+            return ((Symbol)stack.elementAt(tos)).right + 1;
+        } else {
+			return -1;
+		}
+    }
+
+:};
+
+terminal TOKEN, SEP, DATE;
+terminal Double FLOAT;
+terminal SET, POWER, WATER;
+terminal CHANGE1, INC, DEC, AVG;
+terminal TRUE, FALSE;
+terminal AND, OR, NOT;
+terminal CHANGE2, PRESS, TEMP, ADD, SUB;
+terminal DASH, SC, RO, RC, QM, CM, C, TAG, ARROW;
+
+non terminal prog;
+non terminal header, sequence1, sequence2;
+non terminal token_list_1, date_list_1, token_list_2;
+
+non terminal states_section;
+non terminal Double[] set_decl, cmd_list, cmd1, cmd2, emptyin_1, emptyin_2;
+non terminal Double empty_water, empty_power, var_list;
+non terminal Boolean bool_expr;
+non terminal Double avg;
+non terminal Double[] float_list, var;
+
+precedence left OR;
+precedence left AND;
+precedence left NOT;
+
+start with prog;
+
+prog ::= header SEP states_section;
+
+/******************************
+**********HEADER***************
+******************************/
+
+header ::= sequence1 | sequence2;
+
+sequence1 ::= token_list_1 date_list_1;
+token_list_1 ::= token_list_1 TOKEN TOKEN TOKEN | TOKEN TOKEN TOKEN TOKEN;
+date_list_1 ::= DATE DATE DATE | DATE DATE DATE DATE DATE DATE DATE DATE DATE DATE DATE DATE DATE;
+
+sequence2 ::= DATE DATE DATE
+			  | DATE DATE DATE token_list_2
+			  | DATE DATE token_list_2 DATE
+			  | DATE token_list_2 DATE DATE
+			  | DATE token_list_2 DATE DATE token_list_2
+			  | DATE token_list_2 DATE token_list_2 DATE
+			  | DATE DATE token_list_2 DATE token_list_2
+			  | DATE token_list_2 DATE token_list_2 DATE token_list_2;
+token_list_2 ::= token_list_2 TOKEN | TOKEN;
+
+/******************************
+**********STATES***************
+******************************/
+
+states_section ::= set_decl:v cmd_list;
+
+set_decl ::= SET POWER FLOAT:fp DASH WATER FLOAT:fw SC {:
+				RESULT = new Double[2];
+				RESULT[0] = fp;
+				RESULT[1] = fw;
+				System.out.println("power: " + RESULT[0] + " water: " + RESULT[1]);
+			 :}
+			 | SET WATER FLOAT:fw DASH POWER FLOAT:fp SC {:
+				RESULT = new Double[2];
+				RESULT[0] = fp;
+				RESULT[1] = fw;
+				System.out.println("power: " + RESULT[0] + " water: " + RESULT[1]);
+			 :}
+			 | SET POWER FLOAT:fp empty_water:fw SC {:	
+			 	RESULT = new Double[2];
+				RESULT[0] = fp;
+				RESULT[1] = fw;
+				System.out.println("power: " + RESULT[0] + " water: " + RESULT[1]);
+			 :}
+			 | SET WATER FLOAT:fw empty_power:fp SC {:	
+			 	RESULT = new Double[2];
+				RESULT[0] = fp;
+				RESULT[1] = fw;
+				System.out.println("power: " + RESULT[0] + " water: " + RESULT[1]);
+			 :}
+			 | empty_power:fp empty_water:fw {:	
+			 	RESULT = new Double[2];
+				RESULT[0] = fp;
+				RESULT[1] = fw;
+				System.out.println("power: " + RESULT[0] + " water: " + RESULT[1]);
+			 :};
+			 
+empty_water ::= {: RESULT = new Double(100.0); :};
+empty_power ::= {: RESULT = new Double(100.0); :};
+
+cmd_list ::= cmd_list cmd1:x {:
+				RESULT = new Double[2];
+				RESULT[0] = x[0];
+				RESULT[1] = x[1]; 
+			:}
+			| cmd_list cmd2:y {:
+				RESULT = new Double[2];
+				RESULT[0] = y[0];
+				RESULT[1] = y[1]; 
+			:}
+			| cmd1:z {:
+				RESULT = new Double[2];
+				RESULT[0] = z[0];
+				RESULT[1] = z[1];  
+			:}
+			| cmd2:t {:
+				RESULT = new Double[2];
+				RESULT[0] = t[0];
+				RESULT[1] = t[1];  
+			:};
+
+cmd1 ::= CHANGE1 DEC POWER bool_expr:b QM avg:x C avg:y SC {:
+			Double[] d = (Double[])(parser.stack(-9));
+			if(b) {
+				d[0] -= x;
+			} else {
+				d[0] -= y;
+			}
+			System.out.println("power: " + d[0] + " water: " + d[1]);
+			RESULT = new Double[2];
+			RESULT[0] = d[0];
+			RESULT[1] = d[1]; 
+		 :}
+		 | CHANGE1 INC POWER bool_expr:b QM avg:x C avg:y SC {:
+			Double[] d = (Double[])(parser.stack(-9));
+			if(b) {
+				d[0] += x;
+			} else {
+				d[0] += y;
+			}
+			System.out.println("power: " + d[0] + " water: " + d[1]);
+			RESULT = new Double[2];
+			RESULT[0] = d[0];
+			RESULT[1] = d[1];
+		 :}
+		 | CHANGE1 DEC WATER bool_expr:b QM avg:x C avg:y SC {:
+			Double[] d = (Double[])(parser.stack(-9));
+			if(b) {
+				d[1] -= x;
+			} else {
+				d[1] -= y;
+			}
+			System.out.println("power: " + d[0] + " water: " + d[1]);
+			RESULT = new Double[2];
+			RESULT[0] = d[0];
+			RESULT[1] = d[1];
+		 :}
+		 | CHANGE1 INC WATER bool_expr:b QM avg:x C avg:y SC {:
+			Double[] d = (Double[])(parser.stack(-9));
+			if(b) {
+				d[1] += x;
+			} else {
+				d[1] += y;
+			}
+			System.out.println("power: " + d[0] + " water: " + d[1]);
+			RESULT = new Double[2];
+			RESULT[0] = d[0];
+			RESULT[1] = d[1];
+		 :};
+
+bool_expr ::= bool_expr:b1 AND bool_expr:b2 {:
+				if (b1 && b2) {
+					RESULT = new Boolean(true);
+				} else {
+					RESULT = new Boolean(false);
+				}
+			  :} 
+			  | bool_expr:b1 OR bool_expr:b2 {:
+					if (b1 || b2) {
+						RESULT = new Boolean(true);
+					} else {
+						RESULT = new Boolean(false);
+					}
+			  :}
+			  | NOT RO bool_expr:b RC {:
+					if (b) {
+						RESULT = new Boolean(false);
+					} else {
+						RESULT = new Boolean(true);
+					}
+			  :}
+			  | NOT TRUE {:
+					RESULT = new Boolean(false);
+			  :}
+			  | NOT FALSE {:
+					RESULT = new Boolean(true);
+			  :}
+			  | TRUE {:
+					RESULT = new Boolean(true);
+			  :}
+			  | FALSE {:
+					RESULT = new Boolean(false);
+			  :};
+
+avg ::= AVG RO float_list:f RC {:
+			RESULT = new Double(f[2]);
+		:};
+
+float_list ::= float_list:x CM FLOAT:y {:
+				 RESULT = new Double[3];
+				 RESULT[0] = x[0]+y;
+				 RESULT[1] = x[1]+1;
+				 RESULT[2] = RESULT[0]/RESULT[1];	
+			   :}
+               | FLOAT:z {: 
+					RESULT = new Double[3];
+					RESULT[0] = z;
+					RESULT[1] = 1.0;
+					RESULT[2] = z;
+			   :}
+               | float_list:b avg:a {: 
+					RESULT = new Double[3];
+					RESULT[0] = b[0]+a;
+					if ((int)a.intValue() != 0) {
+						RESULT[1] = b[1]+1;
+					    RESULT[2] = RESULT[0]/RESULT[1];
+					} else {
+						RESULT[1] = b[1] ;
+						RESULT[2] = b[2];
+					}
+			    :}
+			    | {: 
+					RESULT = new Double[3];
+					RESULT[0] = 0.0;
+					RESULT[1] = 0.0;
+					RESULT[2] = 0.0;
+				:};
+		 
+cmd2 ::= CHANGE2 FLOAT:p PRESS FLOAT:t TEMP TAG POWER ARROW var_list:v SC {: 
+			Double[] d = (Double[])(parser.stack(-10));
+			RESULT = new Double[2];	
+			RESULT[0] = v + d[0];
+			RESULT[1] = d[1];	
+			System.out.println("power: " + RESULT[0] + " water: " + RESULT[1]); :}
+		 | CHANGE2 FLOAT:p PRESS FLOAT:t TEMP TAG WATER ARROW var_list:v SC {: 
+			Double[] d = (Double[])(parser.stack(-10));		
+			RESULT = new Double[2];	
+			RESULT[0] = d[0];
+			RESULT[1] = v + d[1];
+			System.out.println("power: " + RESULT[0] + " water: " + RESULT[1]); :};
+
+var_list ::= var_list:v CM emptyin_1:e var:x {:
+				Double d;
+				if (x[0].intValue() == 0) {
+					d = e[0]*x[1];
+				} else {
+					d = e[1]*x[1];
+				}
+				d += v;
+				RESULT = new Double(d); 
+			 :} 
+		     | emptyin_2:e var:y {: 
+				Double d;			
+				if (y[0].intValue() == 0) {
+					d = e[0]*y[1]; 
+				} else {
+					d = e[1]*y[1];
+				}
+				RESULT = new Double(d);
+			 :};
+
+emptyin_1 ::= {:
+	Double d0 = (Double)(parser.stack(-8));
+	Double d1 = (Double)(parser.stack(-6));
+	RESULT = new Double[2];
+	RESULT[0] = d0;
+	RESULT[1] = d1;
+:};
+
+emptyin_2 ::= {:
+	Double d0 = (Double)(parser.stack(-6));
+	Double d1 = (Double)(parser.stack(-4));
+	RESULT = new Double[2];
+	RESULT[0] = d0;
+	RESULT[1] = d1;
+:};
+
+var ::= PRESS ADD FLOAT:f {:
+			Double[] d = new Double[2];
+			d[0] = 0.0;
+			d[1] = (Double)f;
+			RESULT = (Double[])d;
+		:}
+		| PRESS SUB FLOAT:f {:
+			Double[] d = new Double[2];
+			d[0] = 0.0;
+			d[1] = (Double)f;
+			d[1] *= (Double)(-1.0);
+			RESULT = (Double[])d;
+		:}
+		| TEMP ADD FLOAT:f {:
+			Double[] d = new Double[2];
+			d[0] = 1.0;
+			d[1] = (Double)f;
+			RESULT = (Double[])d;
+		:}
+		| TEMP SUB FLOAT:f {:
+			Double[] d = new Double[2];
+			d[0] = 1.0;
+			d[1] = (Double)f;
+			d[1] *= (Double)(-1.0);
+			RESULT = (Double[])d;
+		:};
+
