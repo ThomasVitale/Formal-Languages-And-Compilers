@@ -1,0 +1,123 @@
+import java_cup.runtime.*;
+import java.io.*;
+import java.util.*;
+
+init with {: 
+	symbolTable = new HashMap<>();
+	
+	System.out.println("Achieved scores:");
+:}
+
+parser code {:
+
+	public static HashMap<String,HashMap<String,Integer>> symbolTable;
+	
+	public void report_error(String message, Object info) {
+		StringBuffer m = new StringBuffer(message);
+		if (info instanceof Symbol) {
+			if (((Symbol)info).left != -1 && ((Symbol)info).right != -1) {
+				int line = (((Symbol)info).left)+1;
+				int column = (((Symbol)info).right)+1;
+				m.append("(line " + line + ", column " + column + ")");
+			}
+		}
+		System.err.println(m);	
+	}
+	
+	public Symbol getToken() {
+        return ((Symbol)stack.elementAt(tos));
+    }
+    
+    public Object stack(int position) {	
+		return (((Symbol)stack.elementAt(tos+position)).value);
+	}
+
+:}
+
+terminal RO, RC, ARROW, C, CM, PT, S, EQ, PLUS, MINUS, STAR, DIV;
+terminal Integer INT;
+terminal String ID, WORD;
+
+non terminal program, decl_list, decl, descr_list, descr;
+non terminal HashMap attr_list;
+non terminal Object[] attr;
+non terminal Integer review_list, review, mark;
+non terminal StringBuffer word_list;
+non terminal String id, word, nto;
+
+start with program;
+
+program ::= decl_list PT descr_list;
+
+decl_list ::= decl_list decl | decl;
+
+decl ::= RO attr_list:a RC ARROW id:b {:
+		 	parser.symbolTable.put((String)b,a);
+		 :};
+
+attr_list ::= attr_list:a CM attr:b {:
+			  	a.put((String)b[0], (Integer)b[1]);
+			  	RESULT = a;
+			  :} 
+			  | attr:a {:
+			  	HashMap<String,Integer> h = new HashMap<String,Integer>();
+			  	h.put((String)a[0], (Integer)a[1]);
+			  	RESULT = h;
+			  :};
+
+attr ::= id:a C INT:b {:
+		 	RESULT = new Object[2];
+		 	RESULT[0] = new String(a);
+		 	RESULT[1] = new Integer(b);
+		 :};
+		 
+
+descr_list ::= descr_list descr | descr;
+
+descr ::= id C review_list:a EQ word_list:b S {:
+		  	System.out.println(b.toString() + ", " + a);
+		  :};
+
+review_list ::= review_list:a nto CM review:b {:
+					int z = a.intValue() + b.intValue();
+					RESULT = new Integer(z);
+				:}
+			    | review:a {:
+			    	RESULT = a;
+			    :};
+nto ::= {: RESULT = (String)parser.stack(-2); :};
+
+review ::= mark:a id:b {:
+			String s = (String)parser.stack(-3);
+			HashMap<String,Integer> m = parser.symbolTable.get(s);
+			Integer i = (Integer)m.get(b);
+			int z = a.intValue() * i.intValue();
+			RESULT = new Integer(z);
+	       :};
+
+mark ::= STAR {: RESULT = new Integer(3); :}
+		 | PLUS {: RESULT = new Integer(2); :}
+		 | DIV {: RESULT = new Integer(1); :}
+		 | MINUS {: RESULT = new Integer(0); :};
+
+word_list ::= word_list:sb word:w {:
+				sb.append(" ");
+			 	sb.append(w);
+			 	RESULT = sb;
+			 :}
+			 | word:a {:
+			 	StringBuffer sb = new StringBuffer();
+			 	sb.append(a);
+			 	RESULT = sb;
+			 :};
+
+id ::= ID:a {: RESULT = a; :}
+	   | WORD:b {: RESULT = b; :};
+
+word ::= INT:a {: RESULT = a.toString(); :}
+		 | WORD:b {: RESULT = b; :};
+
+
+
+
+
