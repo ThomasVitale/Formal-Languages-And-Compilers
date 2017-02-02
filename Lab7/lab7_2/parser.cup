@@ -1,0 +1,70 @@
+import java_cup.runtime.*;
+
+parser code {:
+
+	public void report_error(String message, Object info) {
+		StringBuffer m = new StringBuffer(message);
+		if (info instanceof Symbol) {
+			if (((Symbol)info).left != -1 && ((Symbol)info).right != -1) {
+				int line = (((Symbol)info).left)+1;
+				int column = (((Symbol)info).right)+1;
+				m.append("(line " + line + ", column " + column + ")");
+			}
+		}
+		System.err.println(m);	
+	}
+	
+	public Object stack(int position) {
+        return (((Symbol)stack.elementAt(tos+position)).value);
+    }
+
+:}
+
+terminal STAR, CM, S, SO, SC;
+terminal Integer INT;
+terminal String TYPE, ID;
+
+non terminal decl_list, decl;
+non terminal te_node var, var_list, ptr, array, type;
+
+start with decl_list;
+
+decl_list ::= /* empty */ 
+			  | decl_list decl S 
+			  | decl_list error S {: 
+			  		parser.report_error("Error in declaration", null); 
+			  :};
+
+decl ::= type var_list;
+
+type ::= TYPE:t {:
+	RESULT = te_node.te_make_base(t);
+:};
+
+var_list ::= var_list:t CM {: RESULT = (te_node)parser.stack(-1); :} var {:
+				RESULT = t;
+			 :}
+			 | var:t {:
+			 	RESULT = t;
+			 :};
+
+var ::= ptr ID:a array:t {:
+			System.out.print("var " + a + " :");
+			t.toString();
+			System.out.print("\n");
+			RESULT= (te_node)parser.stack(-3);	
+		:};
+
+ptr ::= /* empty */ {:
+			RESULT = (te_node)parser.stack(0);	
+		:} 
+		| ptr:a STAR {:
+			RESULT = te_node.te_make_pointer(a);
+		:};
+
+array ::= /* empty */ {:
+			RESULT = (te_node)parser.stack(-1);
+		  :}
+		  | array:a SO INT:b SC {:
+		  	RESULT = te_node.te_make_array(b.intValue(),a);
+		  :};
